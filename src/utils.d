@@ -22,10 +22,6 @@ public string CYAN = "\033[0;36m";
 public string YELLOW = "\033[0;93m";
 
 public string BOLD = "\033[1m";
-public string BRED = "\033[1;31m";
-public string BYELLOW = "\033[1;33m";
-public string BPURPLE = "\033[1;35m";
-
 public string UNDER = "\033[4m";
 
 public void log(T)(T arg, string file = __FILE__, size_t line = __LINE__) {
@@ -44,12 +40,12 @@ public void pverbose(T)(lazy T arg) {
 
 public void pwarn(T)(lazy T arg) {
     if (warn) {
-        write(BPURPLE, "Warning", OFF, ": ", arg);
+        write(PURPLE, BOLD, "Warning", OFF, ": ", arg);
     }
 }
 
 public void perror(T)(lazy T arg) {
-    write(BRED, "Error", OFF, ": ", arg);
+    write(RED, BOLD, "Error", OFF, ": ", arg);
 }
 
 public string raw(string str) {

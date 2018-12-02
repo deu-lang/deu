@@ -229,14 +229,15 @@ void get_flags(string[] args, Flags* flags)
 		case "C":
 		case "no-color":
 			// OFF = "";
-			RED = "";
-			GREEN = "";
-			GOLD = "";
-			BLUE = "";
-			BRED = "";
-			BGOLD = "";
-			BPURPLE = "";
-			UNDER = "";
+			RED    = "";
+			GREEN  = "";
+			GOLD   = "";
+			BLUE   = "";
+			PURPLE = "";
+			CYAN   = "";
+			YELLOW = "";
+			BOLD   = "";
+			UNDER  = "";
 			break;
 
 		default:
