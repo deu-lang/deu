@@ -269,8 +269,7 @@ unittest {
     passed &= unassert(lexer.tokens[ 8].position == 26, "Error detecting positions.");
 
     if (passed) 
-        uprint("\t", YELLOW, __FILE__, OFF, "\t- ", GREEN, BOLD, "DONE\n", OFF);
+        uprint("\t", YELLOW, (__FILE__), OFF, "\t- ", GREEN, BOLD, "DONE\n", OFF);
     else 
-        writeln("--= ", BLUE, "UNITTEST ", OFF, __FILE__, ": ", RED, "failed", OFF, " =--");
-
+        writeln("--= ", CYAN, "UNITTEST ", OFF, __FILE__, ": ", RED, "failed", OFF, " =--");
 }

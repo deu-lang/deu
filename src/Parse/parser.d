@@ -226,7 +226,19 @@ class Parser
         /// Statement: | expression
         ///            | let_statement
         ///            | if_statement
-        return null;
+
+        switch(this.currentToken.type) {
+            
+            case tType.ID:
+            case tType.REAL:
+            case tType.INT:
+                return parseExpression();
+
+            default:
+                return null;
+        }
+
+        // return null;
     }
 
     AST[] parse()

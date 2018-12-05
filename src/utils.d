@@ -10,7 +10,7 @@
 module deu.utils;
 
 public import std.stdio : write, writeln;
-public import std.conv  : to;
+public import std.conv : to;
 
 public string OFF = "\033[0m";
 public string RED = "\033[0;31m";
@@ -24,59 +24,73 @@ public string YELLOW = "\033[0;93m";
 public string BOLD = "\033[1m";
 public string UNDER = "\033[4m";
 
-public void log(T)(T arg, string file = __FILE__, size_t line = __LINE__) {
+public void log(T)(T arg, string file = __FILE__, size_t line = __LINE__)
+{
     writeln(OFF, "[", YELLOW, file, " at ", line, OFF, "]: ", arg);
 }
 
-
 public bool verbose = false;
-public bool warn    = true;
+public bool warn = true;
 
-public void pverbose(T)(lazy T arg) {
-    if (verbose) {
+public void pverbose(T)(lazy T arg)
+{
+    if (verbose)
+    {
         write(OFF, arg);
     }
 }
 
-public void pwarn(T)(lazy T arg) {
-    if (warn) {
+public void pwarn(T)(lazy T arg)
+{
+    if (warn)
+    {
         write(PURPLE, BOLD, "Warning", OFF, ": ", arg);
     }
 }
 
-public void perror(T)(lazy T arg) {
+public void perror(T)(lazy T arg)
+{
     write(RED, BOLD, "Error", OFF, ": ", arg);
 }
 
-public string raw(string str) {
+public string raw(string str)
+{
     string newstring = "";
-    foreach(c; str) {
-        if(c == '\n') {
+    foreach (c; str)
+    {
+        if (c == '\n')
+        {
             newstring ~= GOLD ~ "\\n" ~ OFF;
             continue;
         }
-        if(c == '\t') {
+        if (c == '\t')
+        {
             newstring ~= GOLD ~ "\\t" ~ OFF;
             continue;
         }
-        
+
         newstring ~= c;
     }
     return newstring;
 }
 
-public string repr(string str, string ch) pure nothrow @safe
+public string repr(string str, string ch)
 {
-    if (str.length > 50) return ch;
-    else return str;
+    if (str.length > 50)
+        return ch;
+    else
+        return str;
 }
 
-string dir_to_file(string directory) {
+string pathGetFileName(string directory)
+{
     char[] dir = directory.dup();
 
-    foreach_reverse(i, c ; dir) {
-        if (c == '/') {
-            return to!string(dir[i+1 .. $]);
+    foreach_reverse (i, c; dir)
+    {
+        if (c == '/')
+        {
+            return to!string(dir[i + 1 .. $]);
         }
     }
 
@@ -85,27 +99,31 @@ string dir_to_file(string directory) {
 
 public uint[3] VERSION = [0, 0, 0];
 
-
 /// unittest print
-void uprint(T...)(T args, string file = __FILE__, size_t line = __LINE__) {
-    write("[", CYAN, "unittest ", OFF, (file), " at ", line, "] ", args);
+void uprint(T...)(T args, bool _debug = false, string file = __FILE__, size_t line = __LINE__)
+{
+    if (_debug)
+        write("[", CYAN, "unittest ", OFF, pathGetFileName(file), " at ", line, "] ", args);
+    else
+        write("[", CYAN, "unittest", OFF, "] ", args);
     // write("[", BLUE, "unittest ", OFF, (file), " at ", line, "] ", args);
 }
 
+bool unassert(bool cond, string msginfo = "", string file = __FILE__, uint line = __LINE__)
+{
 
-bool unassert(bool cond, string msginfo = "", string file = __FILE__, uint line = __LINE__) {
-    
-    void uprint(T...)(T args) {
-        write("[", BLUE, "unittest ", OFF, (file), " at ", line, "] ", args);
-    }
+    // void uprint(T...)(T args) {
+    //     write("[", CYAN, "unittest ", OFF, (file), " at ", line, "] ", args);
+    // }
 
-    if (msginfo != "") {
-        msginfo = ": " ~ msginfo;
-    }
+    if (!cond)
+    {
+        if (msginfo != "")
+            msginfo = ": " ~ msginfo;
 
-    if(!cond) {
-        string pr = "\t" ~ YELLOW ~ dir_to_file(file) ~ OFF ~ "\t- " ~ RED ~ BOLD ~ "FAILED" ~ OFF;
-        pr ~= msginfo ~ '\n';
+        string pr = "\t" ~ YELLOW ~ pathGetFileName(file) ~ OFF ~ "\t\t- "
+            ~ RED ~ BOLD ~ "FAILED" ~ OFF;
+        pr ~= msginfo ~ " at l" ~ to!string(line) ~ ".\n";
         uprint(pr);
         return false;
     }
