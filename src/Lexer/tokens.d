@@ -15,23 +15,43 @@ enum tType
 {
     EOF = 0, // End of file
     EOL, // End of line
-
+    
+    /* Arithmetic operators */
     PLUS,  // `+'
     MINUS, // `-'
     MULT,  // `*'
     DMULT, // `**' 
     DIV,   // `/'
+    LST,   // `<'
+    LTE,   // `<='
+    GRT,   // `>'
+    GTE,   // `>='
 
-    LPAR, // `('
-    RPAR, // `)'
-    EQ,   // `='
-    SEMI, // `;'
+    /* Syntax operators */
+    QUO,  // `"'
+    LPAR,  // `('
+    RPAR,  // `)'
+    EQ,    // `='
+    COMMA, // `,'
+    SEMI,  // `;'
+    COLON, // `:'
+    CRLL, // `{`
+    CRLR, // `}`
+    LBRC, // `[`
+    RBRC, // `]`
 
+
+    /* Literals */
+    STR,  // String
     INT,  // Integer
     REAL, // Float
     ID,   // Identifiers
 
-    LET, // 'let'
+    /* Keywords */
+    FUNC, // 'func'
+    VAR,  // 'var'
+    RET,  // 'return'
+    IF,   // 'if'
 
     MAX
 }
@@ -55,7 +75,7 @@ struct Token
 
     private string repr()
     {
-        if (type == tType.REAL || type == tType.INT)
+        if (type == tType.REAL || type == tType.INT || type == tType.VAR)
         {
             return BLUE ~ to!string(value) ~ OFF;
         }
@@ -87,15 +107,21 @@ static string repr(Token*[] tokens)
 ///
 static bool is_keyword(char[] id)
 {
-    return (id == "let");
+    return (id == "var") || (id == "func") || (id == "return") || (id == "if");
 }
 
 static tType get_keywordType(char[] id)
 {
     switch (id)
     {
-    case ['l', 'e', 't']:
-        return tType.LET;
+    case "var".dup:
+        return tType.VAR;
+    case "func".dup:
+        return tType.FUNC;
+    case "return".dup:
+        return tType.RET;
+    case "if".dup:
+        return tType.IF;
 
     default:
         import deu.errors, deu.utils;

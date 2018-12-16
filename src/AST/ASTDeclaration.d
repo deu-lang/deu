@@ -10,10 +10,7 @@
 module deu.ast.astdeclaration;
 
 import deu.ast.base;
-import deu.lex.tokens : Token, tType;
-import deu.utils : to;
-
-// import deu.ast.visitor;
+import deu.utils : to, format;
 
 class ASTDeclaration : AST
 {
@@ -21,11 +18,33 @@ class ASTDeclaration : AST
     string id;
     /// Value
     ASTExpression value;
+    ///
+    string type;
+    ///
+    bool isFunctionParameter;
 
     /// Constructor
-    this(string id, ASTExpression value)
+    this(string id, ASTExpression value, string type, bool isFunctionParameter = false)
     {
         this.id = id;
         this.value = value;
+        this.type = type;
+        this.isFunctionParameter = isFunctionParameter;
     }
+
+    override bool semiEnd() {
+        return true;
+    }
+
+    override string transpile() {
+        if(isFunctionParameter) {
+            if(value is null) return format("%s %s", this.type, this.id);
+            return format("%s %s = %s", this.type, this.id, value.transpile());
+        } else {
+            if(type == "") return format("auto %s = %s", this.id, value.transpile());
+            return format("%s %s = %s", this.type, this.id, value.transpile());
+        }
+    }
+    
+
 }

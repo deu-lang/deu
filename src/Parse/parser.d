@@ -13,18 +13,7 @@ import deu.lex.lexer;
 import deu.lex.tokens;
 
 import deu.errors;
-
-import deu.ast.base;
-import deu.ast.astnumber;
-import deu.ast.astbinop;
-import deu.ast.astunop;
-
-// import deu.ast.astexpression;
-import deu.ast.astdeclaration;
-import deu.ast.astvar;
-// import deu.ast.astunop;
-// import deu.ast.astcompound;
-
+import deu.ast.generic;
 import deu.utils;
 
 class Parser
@@ -56,6 +45,16 @@ class Parser
             this.currentToken = null;
     }
 
+    /// Peak the next token
+    Token* peak()
+    {
+        size_t c = this.counter;
+        if (++c < this.tokens.length)
+            return this.tokens[c];
+        else
+            return null;
+    }
+
     /// Expect a tType.
     Token* expect(uint t)
     {
@@ -67,9 +66,10 @@ class Parser
         }
         else
         {
-            throw new DException("Expected '" ~ 
-                to!string(cast(tType)t) ~ "', got '" ~ 
-                to!string(cast(tType) this.currentToken.type) ~ "'.");
+            throw new DException(
+                "Expected '" ~ to!string(cast(tType) t) ~ "', got '" ~ 
+                to!string(cast(tType) this.currentToken.type) ~ "' at " ~ 
+                to!string(this.currentToken.linepos) ~ ".");
         }
     }
 
@@ -103,9 +103,9 @@ class Parser
         }
         else
         {
-            throw new DException("Expected '" ~ 
-                to!string(cast(tType) t) ~ "', got '" ~ 
-                to!string(cast(tType) this.currentToken.type) ~ "'.");
+            throw new DException("Expected '" ~ to!string(cast(tType) t) ~ 
+                "', got '" ~ to!string(cast(tType) this.currentToken.type) ~ "' at " ~ 
+                to!string(this.currentToken.linepos) ~ ".");
         }
     }
 
@@ -124,6 +124,42 @@ class Parser
 
         return accept(t);
     }
+    
+    /// Parse Value.
+    ASTExpression _pValue() {
+        switch(this.currentToken.type) 
+        {
+        case tType.INT:
+        case tType.REAL:
+            Token* accepted = acceptAny();
+            if (this.currentToken.type == tType.DMULT)
+            {
+                Token* operator = acceptAny();
+                return new ASTBinOperator(new ASTNumber(accepted), parseExpression(), operator);
+            }
+            return new ASTNumber(accepted);
+        case tType.STR:
+            Token* accepted = expect(tType.STR);
+            return new ASTString(accepted);
+            /+ case tType.BOOL:
+                Token accepted = expect(tType.BOOL);
+                return new ASTBool(accepted); +/
+
+        case tType.ID:
+            Token* accepted = this.expect(tType.ID);
+            return new ASTVar(accepted.value);
+
+        case tType.LPAR:
+            expect(tType.LPAR);
+            ASTExpression node = parseExpression();
+            expect(tType.RPAR);
+            return node;
+            /+ case tType.LST:
+                return parseReference(); +/
+        default:
+            throw new DException(format("Expecting factor, not %s.", to!string(*this.currentToken)));
+        }
+    }
 
     /// Parse Factor.
     ASTExpression _pFactor()
@@ -140,34 +176,27 @@ class Parser
 
         case tType.INT:
         case tType.REAL:
-            Token* accepted = acceptAny();
-            if (this.currentToken.type == tType.DMULT)
-            {
-                Token* operator = acceptAny();
-                return new ASTBinOperator(new ASTNumber(accepted), parseExpression(), operator);
-            }
-            return new ASTNumber(accepted);
-            /+ case tType.STRING:
-                Token accepted = expect(tType.STRING);
-                return new ASTString(accepted); +/
-            /+ case tType.BOOL:
-                Token accepted = expect(tType.BOOL);
-                return new ASTBool(accepted); +/
-
-            // case tType.ID:
-            //     Token* accepted = this.expect(tType.ID);
-            //     return new ASTVar(accepted);
-
+        case tType.STR:
+        case tType.ID:
         case tType.LPAR:
-            expect(tType.LPAR);
-            ASTExpression node = parseExpression();
-            expect(tType.RPAR);
-            return node;
-            /+ case tType.LST:
-                return parseReference(); +/
+            ASTExpression fname = _pValue();
+            if(this.currentToken.type == tType.LPAR) {
+                this.expect(tType.LPAR);
+
+                ASTExpression[] params;
+                while (this.currentToken.type != tType.RPAR)
+                {
+                    params ~= this.parseExpression();
+                    this.accept(tType.COMMA);
+                }
+
+                this.expect(tType.RPAR);
+                return new ASTFuncCall(fname, params);
+            }
+            return fname;
 
         default:
-            throw new DException("Expecting factor.");
+            throw new DException(format("Expecting factor, not %s.", to!string(*this.currentToken)));
         }
     }
 
@@ -188,69 +217,202 @@ class Parser
         return node;
     }
 
-    /// Parse Expression
-    ASTExpression parseExpression()
+    ///
+    ASTExpression _pOTerm()
     {
-        /* Parse expression function */
         ASTExpression node = _pTerm();
-        while (this.currentToken && (this.currentToken.type == tType.PLUS
-                || this.currentToken.type == tType.MINUS))
+        while (this.currentToken.type != tType.EOF
+                && (this.currentToken.type == tType.LST || this.currentToken.type == tType.GRT ||
+                    this.currentToken.type == tType.LTE || this.currentToken.type == tType.GTE))
         {
             Token* token = acceptAny();
             node = new ASTBinOperator(node, _pTerm(), token);
         }
+
         return node;
     }
 
-    /// Parse Let
-    ASTDeclaration parseLet() {
-        /// LetStatement: LET ID | EOL
+    /// Parse Expression
+    ASTExpression parseExpression()
+    {
+        /* Parse expression function */
+        ASTExpression node = _pOTerm();
+        while (this.currentToken && (this.currentToken.type == tType.PLUS
+                || this.currentToken.type == tType.MINUS))
+        {
+            Token* token = acceptAny();
+            node = new ASTBinOperator(node, _pOTerm(), token);
+        }
+        return node;
+    }
+
+    /// Parse if
+    ASTIf parseIf()
+    {
+        /// ifStatement: IF expression | COLON statements
+        ///                              | CRLL  statementss CRLR
+
+        this.expect(tType.IF);
+        
+        ASTExpression expr = this.parseExpression();
+        
+        if(this.accept(tType.COLON) !is null)
+            return new ASTIf(expr, [this.parseStatement()]);
+        
+        
+        this.expect(tType.CRLL);
+
+        AST[] statements = [];
+        while (this.currentToken.type != tType.CRLR) {
+            statements ~= this.parseStatement();
+        }
+
+        this.expect(tType.CRLR);
+
+        
+        return new ASTIf(expr, statements);
+    }
+
+    /// Parse return statement
+    ASTReturn parseReturn()
+    {
+        /// returnStatement: RETURN expression SEMI
+
+        this.expect(tType.RET);
+        ASTExpression expr = this.parseExpression();
+        this.expect(tType.SEMI);
+
+        return new ASTReturn(expr);
+    }
+
+    /// Parse var
+    ASTDeclaration parseVar()
+    {
+        /// varStatement: var ID | EOL
         ///                      | SEMI
         ///                      | EQ expression
 
-        this.expect(tType.LET);
-        string id = to!string(this.expect(tType.ID).value);        
+        this.expect(tType.VAR);
+        auto p = parseDeclaration(false);
+        this.expectLOR(tType.SEMI);
+
+        return p;
+    }
+
+    /// Parse declaration
+    ASTDeclaration parseDeclaration(bool isfuncparam)
+    {
+        string id = to!string(this.expect(tType.ID).value);
+        string type = "";
+        
+        if (this.accept(tType.COLON) !is null) {
+            type = parseType();
+        } else if(isfuncparam) {
+            throw new DException(
+                format("Expecting type for parameter '%s'.", id)
+            );
+        }
+
         ASTExpression expr;
 
-        if(this.currentToken.type == tType.EQ) {
+        if (this.currentToken.type == tType.EQ)
+        {
             this.expect(tType.EQ);
             expr = parseExpression();
         }
 
         // return null;
-        return new ASTDeclaration(id, expr);
+        return new ASTDeclaration(id, expr, type, isfuncparam);
+    }
+
+    /// Parse function
+    ASTFunc parseFunction()
+    {
+
+        this.expect(tType.FUNC);
+        string id = to!string(this.expect(tType.ID).value);
+        this.expect(tType.LPAR);
+
+        ASTDeclaration[] params;
+        while (this.currentToken.type != tType.RPAR)
+        {
+            params ~= parseDeclaration(true);
+        }
+
+        this.expect(tType.RPAR);
+        this.expect(tType.CRLL);
+
+        AST[] statements = [];
+        while (this.currentToken.type != tType.CRLR)
+        {
+            statements ~= parseStatement();
+        }
+
+        this.expect(tType.CRLR);
+
+        return new ASTFunc(id, statements, params);
+    }
+
+    /// Parse type
+    string parseType()
+    {
+        string id = to!string(this.expect(tType.ID).value);
+        if(this.currentToken.type == tType.LBRC) {
+            this.expect(tType.LBRC); // [
+            this.expect(tType.RBRC); // ]
+            
+            return id ~ "[]";
+        }
+        return id;
     }
 
     /// Parse statement
-    AST parseStatement() {
+    AST parseStatement()
+    {
         /// Statement: | expression
-        ///            | let_statement
+        ///            | var_statement
         ///            | if_statement
+        ///            | return_statement
 
-        switch(this.currentToken.type) {
-            
-            case tType.ID:
-            case tType.REAL:
-            case tType.INT:
-                return parseExpression();
+        switch (this.currentToken.type)
+        {
+        case tType.EOL:
+        case tType.EOF:
+            this.accept(tType.EOL);
+            return new ASTNo;
 
-            default:
-                return null;
+        case tType.VAR:
+            return parseVar();
+        case tType.FUNC:
+            return parseFunction();
+        case tType.IF:
+            return parseIf();
+        case tType.RET:
+            return parseReturn();
+
+        case tType.ID:
+        case tType.REAL:
+        case tType.INT:
+            auto statement = parseExpression();
+            this.accept(tType.SEMI);
+            return statement;
+
+        default:
+            throw new DException("Unexpected token " ~ this.currentToken.toString());
         }
 
         // return null;
     }
 
-    AST[] parse()
+    ASTProgram parse()
     {
+        ASTProgram statements = new ASTProgram([]);
 
-        AST[] statements = [parseStatement()];
+        while (this.currentToken.type != tType.EOF)
+        {
+            statements.append(this.parseStatement());
+        }
 
-        // while (this.currentToken.type != tType.EOF)
-        // {
-            // statements ~= [this.parseExpression()];
-            // statements ~= [this.parseStatement()];
-        // }
         return statements;
     }
 }

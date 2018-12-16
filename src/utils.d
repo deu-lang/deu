@@ -9,8 +9,11 @@
 
 module deu.utils;
 
-public import std.stdio : write, writeln;
+public import std.stdio : write, writeln, File;
+public import std.utf : toUTF8, toUTF16;
+public import regex = std.regex;
 public import std.conv : to;
+public import std.format : format;
 
 public string OFF = "\033[0m";
 public string RED = "\033[0;31m";
@@ -50,7 +53,7 @@ public void pwarn(T)(lazy T arg)
 
 public void perror(T)(lazy T arg)
 {
-    write(RED, BOLD, "Error", OFF, ": ", arg);
+    write(RED, BOLD, "Error", OFF, ": ", arg, "\n");
 }
 
 public string raw(string str)
@@ -84,20 +87,29 @@ public string repr(string str, string ch)
 
 string pathGetFileName(string directory)
 {
-    char[] dir = directory.dup();
-
-    foreach_reverse (i, c; dir)
-    {
-        if (c == '/')
-        {
-            return to!string(dir[i + 1 .. $]);
-        }
-    }
-
-    return "";
+    return pathGetRegex(directory).captures[2];
 }
 
-public uint[3] VERSION = [0, 0, 0];
+string pathGetFileExtension(string directory)
+{
+    return pathGetRegex(directory).captures[3];
+}
+
+string pathGetRootName(string directory)
+{
+    return pathGetRegex(directory).captures[1];
+}
+
+regex.RegexMatch!string pathGetRegex(string path) {
+    return regex.match(path, r"((?:[^/]*/)*)(.*)(\..*)");
+    // return regex.match(path, r"((?:[^/]*/)*)(.*)");
+}
+
+public string backspace(string str, int c = 1) {
+    return to!string(str[0 .. $ - c]);
+}
+
+public uint[3] VERSION = [0, 0, 1];
 
 /// unittest print
 void uprint(T...)(T args, bool _debug = false, string file = __FILE__, size_t line = __LINE__)

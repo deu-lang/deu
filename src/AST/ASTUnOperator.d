@@ -11,6 +11,7 @@ module deu.ast.astunop;
 
 import deu.ast.base;
 import deu.lex.tokens : Token;
+import deu.utils : to;
 // import deu.ast.visitor;
 
 class ASTUnOperator : ASTExpression {
@@ -26,4 +27,28 @@ class ASTUnOperator : ASTExpression {
         this.expression = expression;
         this.operator = operator;
     }
+
+    override bool semiEnd() {
+        return true;
+    }
+
+    override string transpile() {
+        // string op = "";
+        // switch(this.operator) {
+        //     case OP.PLUS:
+        //         op = "+";
+        //     case OP.MINUS:
+        //         op = "-";
+        //     case OP.MULT:
+        //         op = "*";
+        //     case OP.DIV:
+        //         op = "/";
+        //     default:
+        //         throw new DException("Unknown operator " ~ to!string(this.operator) ~ ".");
+        // }
+
+        return to!string(operator.value) ~ expression.transpile();
+    }
+
+
 }

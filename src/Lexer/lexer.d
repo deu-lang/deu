@@ -20,14 +20,20 @@ import std.ascii : isAlpha, isDigit, isAlphaNum, isWhite;
 static bool isOperator(char c) {
     return ((c == '+') || (c == '-') || (c == '*') || (c == '/') ||
             (c == '<') || (c == '>') || (c == ';') || (c == '=') ||
+            // (c == '"') || 
+            (c == '!') || (c == ':') ||
             // (c == '|') || (c == '&') || (c == '^') || (c == '%') ||
-            // (c == '~') || (c == '.') || (c == '!') || (c == ':') ||
-            // (c == '?') || (c == ',') || (c == '{') || (c == '}') ||
+            // (c == '~') || (c == '.') ||  
+            (c == '?') || (c == ',') || (c == '{') || (c == '}') ||
             (c == '[') || (c == ']') || (c == '(') || (c == ')'));
 }
 
 static bool isEOF(char c) {
     return c == '\0';
+}
+
+static bool isString(char c) {
+    return c == '"';
 }
 
 static bool isCommentStart(char c) {
@@ -102,11 +108,11 @@ class Lexer {
         return notEOF(1 + this.position) ? this.input[this.position] : '\0';
     }
     
-    /// LexNumber: Match '[0-9]+\.?[0-9]*'.
+    /// LexNumber: Match /[0-9]+\.?[0-9]*/.
     Token* lexNumber() {
         char[] snum;
         size_t POSI = this.LINEPOS;
-        size_t LINE = this.LINE;
+        // size_t LINE = this.LINE;
 
         while(notEOF() && isDigit(this.currentChar)) {
             snum = snum ~ this.currentChar;
@@ -125,7 +131,31 @@ class Lexer {
         return new Token(tType.INT, snum, this.line, POSI, LINE);
     }
 
-    /// LexOperator: Match any of '+-*/[]()'.
+    /// LexString: Match /".*"/
+    Token* lexString() {
+        if(this.currentChar == '"') {
+            char[] str = [];
+            size_t POSI = this.LINEPOS;
+            advance();
+            while(this.currentChar != '"') {
+                str ~= this.currentChar;
+                advance();
+                
+                if(!notEOF()) {
+                    // which means if eof
+                    throw new DException("Expected string end at " ~ to!string(LINE));
+                }
+            }
+            advance();
+            str ~= '\0';
+            
+            return new Token(tType.STR, str, this.line, POSI, LINE);
+        }
+        
+        throw new DException("No string to be lexed " ~ to!string(LINE));
+    }
+
+    /// LexOperator: Match any of /+-*/[]()/.
     Token* lexOperator() {
         char c = this.currentChar;
         const(size_t) POSI = this.LINEPOS;
@@ -143,11 +173,21 @@ class Lexer {
                 } else return new Token(tType.MULT , ['*'], this.line, POSI, LINE);
                 
             }
+
+            // case '"': return new Token(tType.QUO  , ['"'], this.line, POSI, LINE);
+            case '<': return new Token(tType.LST  , ['<'], this.line, POSI, LINE);
+            case '>': return new Token(tType.GRT  , ['>'], this.line, POSI, LINE);
             case '/': return new Token(tType.DIV  , ['/'], this.line, POSI, LINE);
             case '(': return new Token(tType.LPAR , ['('], this.line, POSI, LINE);
             case ')': return new Token(tType.RPAR , [')'], this.line, POSI, LINE);
             case '=': return new Token(tType.EQ   , ['='], this.line, POSI, LINE);
             case ';': return new Token(tType.SEMI , [';'], this.line, POSI, LINE);
+            case '{': return new Token(tType.CRLL , ['{'], this.line, POSI, LINE);
+            case '}': return new Token(tType.CRLR , ['}'], this.line, POSI, LINE);
+            case '[': return new Token(tType.LBRC , ['['], this.line, POSI, LINE);
+            case ']': return new Token(tType.RBRC , [']'], this.line, POSI, LINE);
+            case ',': return new Token(tType.COMMA, [','], this.line, POSI, LINE);
+            case ':': return new Token(tType.COLON, [':'], this.line, POSI, LINE);
 
             default: 
             throw new DException("Expecting operator, recived: '" ~ c ~ "'.");
@@ -176,7 +216,6 @@ class Lexer {
 
     /// NextToken: Lex any token.
     Token* nextToken() {
-
         /+ See https://en.wikipedia.org/wiki/ASCII +/
         if(isCommentStart(this.currentChar)) {
             while(this.currentChar != '\n' && this.currentChar != '\0')
@@ -198,9 +237,10 @@ class Lexer {
         }
 
         if(isDigit(this.currentChar)) return lexNumber();
+        if(isString(this.currentChar)) return lexString();
         if(isOperator(this.currentChar)) return lexOperator();
         if(isAlpha(this.currentChar)) return lexId();
-        if(isEOF(this.currentChar)) return new Token(tType.EOF, [], this.line, this.LINEPOS, this.LINE);
+        if(isEOF(this.currentChar)) return new Token(tType.EOF, [], "", -1, -1);
 
         throw new DException("Unrecognized character: '" ~ GREEN ~ this.currentChar ~ OFF ~ "'.");
     }
@@ -240,7 +280,7 @@ unittest {
 
 
     string code = `
-        let a = 4 + 32 * 1
+        var a = 4 + 32 * 1
         a = (a / 5.3);
     `;
 
@@ -249,7 +289,7 @@ unittest {
     // uprint("\n", repr(lexer.tokens), "\n");
 
     bool passed = true;
-    passed &= unassert(lexer.tokens[ 1].type == tType.LET,    "Error detecting type `let'.");
+    passed &= unassert(lexer.tokens[ 1].type == tType.VAR,    "Error detecting type `VAR'.");
     passed &= unassert(lexer.tokens[ 2].type == tType.ID,     "Error detecting type IDs.");
     passed &= unassert(lexer.tokens[ 6].type == tType.INT,    "Error detecting type integers.");
     passed &= unassert(lexer.tokens[ 7].type == tType.MULT,   "Error detecting type `*'.");
@@ -269,7 +309,7 @@ unittest {
     passed &= unassert(lexer.tokens[ 8].position == 26, "Error detecting positions.");
 
     if (passed) 
-        uprint("\t", YELLOW, (__FILE__), OFF, "\t- ", GREEN, BOLD, "DONE\n", OFF);
+        uprint("\t", GREEN, (__FILE__), OFF, "\t- ", GREEN, BOLD, "DONE\n", OFF);
     else 
         writeln("--= ", CYAN, "UNITTEST ", OFF, __FILE__, ": ", RED, "failed", OFF, " =--");
 }

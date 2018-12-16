@@ -9,42 +9,87 @@
 
 module deu.storage;
 
+import deu.dobject;
 import deu.errors;
-import deu.utils : to;
+import deu.utils : to, log;
 
 struct Symbol {
+    
+    enum TYPE {
+        MODULE,
+        VAR    
+    }
+
     string name;
-    string type; // use enum here
-    bool   isVar = true;
-    Object* obj = null;
+    TYPE type;
+    DObject obj;
     
     string toString() {
-        return isVar ? ("<" ~ name ~ ":" ~ type ~ " = " ~ obj.toString() ~ ">") : ("<" ~ name ~ ">");
+        return isVar() ? 
+            ("<" ~ name ~ ":" ~ to!string(type) ~ " = " ~ to!string(obj) ~ ">") : 
+            ("<" ~ name ~ ">");
+    }
+
+    bool isVar() {
+        return this.type == TYPE.VAR;
     }
 }
 
 class SymbolTable {
 
-    Symbol[string] symbols;
+    private Symbol*[] symbols;
+    private ulong[string] locations;
+    private ulong[] buffer;
 
     this() {
         // this.symbols = [];
     }
 
     // void init_builtins() {
-        // define(DREAL);
+    //     declare(DREAL);
     // }
 
-    void define(Symbol sym) {
-        this.symbols[sym.name] = sym;
+    ulong* isDeclared(string name) {
+        return name in locations;
     }
 
-    Symbol lookup(string name) {
-        return this.symbols[name];
+    void declare(Symbol sym) {
+        if(this.buffer.length == 0) {
+            this.locations[sym.name] = this.symbols.length;
+            this.symbols ~= [&sym];
+        } else {
+            ulong address = this.buffer[$ - 1];
+            this.locations[sym.name] = address;
+            this.buffer = this.buffer[0 .. $ - 1];
+            this.symbols[address] = &sym;
+        }
     }
+
+    void undeclare(string name) {
+        ulong* symptr = isDeclared(name);
+        if(!symptr) return;
+
+        this.buffer ~= [*symptr];
+        symbols[*symptr] = null;
+    }
+
+    // Symbol lookup(string name) {
+    //     return this.symbols[name];
+    // }
 
     override string toString() {
-        return to!string(symbols);
+        string output = "[";
+
+        foreach (k; this.symbols) {
+            if (k is null) continue;
+            output ~= k.toString() ~ ",\n";
+        } 
+        
+        if (output == "[") {
+            return "EMPTY SCOPE";
+        }
+        
+        return output[0 .. $ - 2] ~ "]";
     }
 }
 
@@ -52,8 +97,20 @@ unittest {
     import deu.utils;
     import std.typecons;
 
-    Symbol int_symbol = {"int", "iuasd", true};
     bool passed = true;
+    
+    Symbol int_val = {"int_val", Symbol.TYPE.VAR, make_dint(53)};
+    
+    SymbolTable table = new SymbolTable;
 
-    uprint("\t", YELLOW, __FILE__, OFF, "\t- ", GREEN, BOLD, "DONE\n", OFF);
+    table.declare(int_val);
+    uprint(table.toString(), "\n");
+
+    table.undeclare("int_val");
+    uprint(table.toString(), "\n");
+
+    if (passed) 
+        uprint("\t", GREEN, (__FILE__), OFF, "\t- ", GREEN, BOLD, "DONE\n", OFF);
+    else 
+        writeln("--= ", CYAN, "UNITTEST ", OFF, __FILE__, ": ", RED, "failed", OFF, " =--");
 }

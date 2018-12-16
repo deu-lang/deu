@@ -11,9 +11,7 @@ module deu.ast.astnumber;
 
 import deu.ast.base;
 import deu.lex.tokens : Token, tType;
-import deu.utils : to;
-
-// import deu.ast.visitor;
+import deu.utils;
 
 class ASTNumber : ASTExpression
 {
@@ -22,7 +20,7 @@ class ASTNumber : ASTExpression
     /// Value of the object.
     union
     {
-        size_t intvalue;
+        int intvalue;
         float flvalue;
     }
 
@@ -32,8 +30,10 @@ class ASTNumber : ASTExpression
     /// Constructor
     this(float value = 0, bool isFloat = true)
     {
-        this.intvalue = to!size_t(value);
-        this.flvalue = value;
+        if (isFloat)
+            this.flvalue = value;
+        else
+            this.intvalue = to!int(value);
         this.isFloat = isFloat;
     }
 
@@ -41,4 +41,15 @@ class ASTNumber : ASTExpression
     {
         this(to!float(tok.value), tok.type == tType.REAL);
     }
+
+    override bool semiEnd() {
+        /// Not applicable tho
+        return true;
+    }
+
+    override string transpile()
+    {
+        return to!string(isFloat ? flvalue : intvalue);
+    }
+
 }

@@ -1,0 +1,10 @@
+func main(args: string[]) {
+    var nfb: int = 10;
+    var number = fib(nfb);
+    printf("The %dth fibbonaci number is %d.\n", nfb, fib(nfb));
+}
+
+func fib(n: int) {
+    if n < 2: return n;
+    return fib(n - 1) + fib(n - 2);
+}

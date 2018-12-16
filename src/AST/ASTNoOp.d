@@ -1,5 +1,5 @@
 /**
- *  Base AST class.
+ *  ASTNo class. Represents literally 'do nothing'
  *  see https://en.wikipedia.org/wiki/Abstract_syntax_tree
  /+ ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――― +/
  *  This script is part of the open-source Deu (http://www.github.com/deu-lang)
@@ -7,21 +7,17 @@
  *  
  */
 
-module deu.ast.base;
+module deu.ast.astno;
 
-interface AST {
-    /// The answer to 'if working as statement, needs semicolon?'
-    bool semiEnd();
+import deu.ast.base;
 
-    /// Translate deu code to D code.
-    string transpile();
-    /// Optimize content
-    
+class ASTNo : AST
+{
+    override bool semiEnd() {
+        return false;
+    }
+
+    override string transpile() {
+        return "";
+    }
 }
-
-/// Expressions are a type of statements that evaluate to a value.
-interface ASTExpression : AST {}
-
-
-/// Tab size for transpiling (2 spaces)
-public static string TAB = "  ";

@@ -9,6 +9,9 @@
 
 import deu.utils;
 import std.file;
+import std.process : spawnProcess, execute, wait;
+import core.thread;
+import std.datetime;
 
 enum execution
 {
@@ -38,16 +41,22 @@ struct Flags
 	/// Script to be evaluated
 	string script;
 	/// Path to the script file.
-	char[] path_to_script = ['.', '/', 'm', 'a', 'i', 'n', '.', 'd', 'f'];
+	string path_to_script = "./main.df";
+	
+	/// Remove the files generated
+	bool keep = false;
 
 	string toString()
 	{
-		return "\tprintHelp: " ~ to!string(phelp) ~ "\n" ~ "\tprintVersion: " ~ to!string(
-				pversion) ~ "\n" ~ "\texit: " ~ to!string(exit) ~ "\n" ~ "\texitCode: " ~ to!string(
-				exitCode) ~ "\n" ~ "\terrorMessage: \"" ~ raw(ermsg()) ~ "\"\n" ~ "\texecution: " ~ to!string(
-				exec) ~ "\n" ~ "\tscript: \"\"\"" ~ repr(script, "<CODE>") ~ "\"\"\"\n" ~ "\tpathToScript: `" ~ repr(
-				to!string(path_to_script), "<PATH>") ~ "'\n" ~ "\tverbose: " ~ to!string(
-				verbose) ~ "\n";
+		return "\tprintHelp: " ~ to!string(phelp) ~ "\n" ~ 
+			   "\tprintVersion: " ~ to!string(pversion) ~ "\n" ~ 
+			   "\texit: " ~ to!string(exit) ~ "\n" ~ 
+			   "\texitCode: " ~ to!string(exitCode) ~ "\n" ~ 
+			   "\terrorMessage: \"" ~ raw(ermsg()) ~ "\"\n" ~ 
+			   "\texecution: " ~ to!string(exec) ~ "\n" ~ 
+			   "\tscript: \"\"\"" ~ raw(repr(script, "<CODE>")) ~ "\"\"\"\n" ~ 
+			   "\tpathToScript: `" ~ repr((path_to_script), "<PATH>") ~ "'\n" ~ 
+			   "\tverbose: " ~ to!string(verbose) ~ "\n";
 	}
 }
 
@@ -58,16 +67,6 @@ int main(string[] args)
 	get_flags(args[1 .. $], flags);
 
 	pverbose("Running ");
-
-	/// PVERBOSE | PVERSION | CALL | RESULT
-	/// true     | true     | yes  | false
-	/// false    | true     | yes  | true
-	/// true     | false    | yes  | false
-	/// false    | false    | no   | N/A
-	/// CALL :: PVERBOSE || PVERSION
-	/// !verb && vers
-	/// !true && true : false
-	/// !true && true : false
 
 	if (verbose)
 		pversion(false);
@@ -91,7 +90,7 @@ int main(string[] args)
 
 	if (flags.exec != execution.NORUN && flags.script == "")
 	{
-		flags.script = readText(to!string(flags.path_to_script));
+		flags.script = readText(flags.path_to_script);
 	}
 
 	if (flags.exec == execution.LEX)
@@ -157,9 +156,32 @@ int main(string[] args)
 		auto lexer = new Lexer(flags.script);
 		lexer.tokenize();
 
-		pverbose(repr(lexer.tokens));
 		auto parser = new Parser(lexer.tokens);
-		writeln(parser.parse());
+		auto program = parser.parse();
+		
+		const string output_d = 
+			pathGetRootName(flags.path_to_script) ~
+			pathGetFileName(flags.path_to_script) ~ ".d";
+		const string output_o = 
+			pathGetRootName(flags.path_to_script) ~
+			pathGetFileName(flags.path_to_script) ~ ".o";
+		
+
+		{
+			File output_file = File(output_d, "w");
+			string output = toUTF8(program.generateProgram());
+			output_file.write(output);
+		}
+
+		auto compile_cmd = spawnProcess(["dmd", output_d]);
+		wait(compile_cmd);
+
+		if(!flags.keep) {
+			auto remove_cmd  = spawnProcess(["rm",  output_o, output_d]);
+			wait(remove_cmd);
+		}
+		// writeln(output_nFile);
+		// writeln(cmd);
 	}
 
 	return 0;
@@ -215,8 +237,12 @@ void get_flags(string[] args, Flags* flags)
 			break;
 		case "c":
 		case "code":
-			flags.path_to_script = ['\0'];
+			flags.path_to_script = "\0";
 			flags.script = next();
+			break;
+		case "k":
+		case "keep":
+			flags.keep = true;
 			break;
 		case "w":
 		case "no-warn":
@@ -229,15 +255,15 @@ void get_flags(string[] args, Flags* flags)
 		case "C":
 		case "no-color":
 			// OFF = "";
-			RED    = "";
-			GREEN  = "";
-			GOLD   = "";
-			BLUE   = "";
+			RED = "";
+			GREEN = "";
+			GOLD = "";
+			BLUE = "";
 			PURPLE = "";
-			CYAN   = "";
+			CYAN = "";
 			YELLOW = "";
-			BOLD   = "";
-			UNDER  = "";
+			BOLD = "";
+			UNDER = "";
 			break;
 
 		default:
@@ -263,7 +289,20 @@ void get_flags(string[] args, Flags* flags)
 				}
 		}
 		else
-			flags.path_to_script = op;
+		{
+			import regex = std.regex;
+			flags.path_to_script = to!string(op);
+
+			if(!regex.match(flags.path_to_script, r"(.*)\.df")) {
+				auto extension = regex.match(flags.path_to_script, r".*(\..+)");
+
+				flags.exit = true;
+				flags.exitCode = 1;
+				flags.ermsg = {
+					return "Unrecognized file extension '" ~ BLUE ~ extension.captures[1] ~ OFF ~ "'.";
+				};
+			}
+		}
 	}
 }
 
@@ -271,13 +310,11 @@ void phelp()
 {
 	string[] helpinfo = [
 		"Usage: deu [OPTION]... [FILE]...\n", "\n",
-		"Options and arguments:\n", 
-		"-h, --help        Print this help.\n",
+		"Options and arguments:\n", "-h, --help        Print this help.\n",
 		"-c, --code [CMD]  Program passed in as string.\n",
 		"-C, --no-color    Turn colored console output off.\n",
 		"-v, --verbose     Use verbose output.\n",
-		"-V, --version     Print Deu version.\n", 
-		"-w, --no-warn     Do not print warnings.\n",
+		"-V, --version     Print Deu version.\n", "-w, --no-warn     Do not print warnings.\n",
 	];
 
 	foreach (l; helpinfo)

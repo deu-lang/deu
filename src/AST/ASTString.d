@@ -1,5 +1,5 @@
 /**
- *  ASTVar class.
+ *  ASTString class.
  *  see https://en.wikipedia.org/wiki/Abstract_syntax_tree
  /+ ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――― +/
  *  This script is part of the open-source Deu (http://www.github.com/deu-lang)
@@ -7,33 +7,34 @@
  *  
  */
 
-module deu.ast.astvar;
+module deu.ast.aststr;
 
 import deu.ast.base;
-import deu.utils : to;
+import deu.lex.tokens : Token, tType;
+import deu.utils : to, toUTF8, backspace;
 
-class ASTVar : ASTExpression
+class ASTString : ASTExpression
 {
-    /// Identifier
-    string id;
+    string value;
 
     /// Constructor
-    this(string id)
+    this(string value)
     {
-        this.id = id;
+        this.value = value;
     }
-    ///
-    this(char[] id)
+
+    this(Token* tok)
     {
-        this(to!string (id));
+        this(to!string(tok.value));
     }
 
     override bool semiEnd() {
+        // Not aplicable tho
         return true;
     }
 
     override string transpile() {
-        return id;
+        return "\"" ~ value.backspace() ~ "\"";
     }
 
 
